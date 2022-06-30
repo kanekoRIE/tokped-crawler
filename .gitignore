@@ -1,3 +1,6 @@
+# Local save
+csv/*
+
 # Logs
 logs
 *.log
