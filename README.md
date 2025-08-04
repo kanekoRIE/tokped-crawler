@@ -25,7 +25,7 @@ node tokped-crawler.js
 Or run performance improved v2
 
 ```
-node new.js
+node tokped-crawler-v2.js
 ```
 
 add help argument to show useable arguments
