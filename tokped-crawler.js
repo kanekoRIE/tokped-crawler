@@ -16,10 +16,8 @@ if (process.argv[3] != null) {
     target_number = process.argv[3];
 }
 
-var page_num = 1;
 var url = new URL('https://www.tokopedia.com/search');
 url.searchParams.set('q', keyword);
-url.searchParams.set('page', page_num);
 if (process.argv[4] != null) {
     url.searchParams.set('pmin', process.argv[4]);
 }
@@ -76,12 +74,12 @@ var product_found = true;
     });
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36');
+    await page.goto(url.href);
     while (products.length <= target_number && product_found) {
-        await page.goto(url.href);
         // activate lazyload
         await autoScroll(page);
         try {
-            await page.waitForSelector('div[data-testid="divSRPContentProducts"]>div:nth-child(2)', {
+            await page.waitForSelector('div[data-testid="divSRPContentProducts"] div.css-5wh65g', {
                 timeout: 5000
             })
         } catch (error) {
@@ -89,25 +87,27 @@ var product_found = true;
             console.log("Product not found or too little.")
         }
         products = products.concat(
-            await page.$$eval('div[data-testid="divSRPContentProducts"] div[data-testid="divProductWrapper"]', products => {
-                var prod = products.map(el => {
-                    var rate_el = el.querySelector('div[data-testid="master-product-card"] i[aria-label="Rating Star"]+span');
-                    var prod_url = el.querySelector('div[data-testid="master-product-card"] a').href;
+            await page.$$eval(
+                'div[data-testid="divSRPContentProducts"] div.css-5wh65g',
+                (products) => {
+                return products
+                    .map(el => {
+                    const name = el.querySelector('span[class*="+tnoqZhn89+NHUA43BpiJg=="]')?.textContent?.trim();
+                    if (!name) return null; // skip if name is empty
 
                     return {
-                        "name": el.querySelector('div[data-testid="master-product-card"] a>div[data-testid="spnSRPProdName"]').textContent,
-                        "desc": prod_url,
-                        "image": el.querySelector('div[data-testid="master-product-card"] div>img[data-testid="imgSRPProdMain"]').src,
-                        "price": el.querySelector('div[data-testid="master-product-card"] a>div[data-testid="spnSRPProdPrice"]').textContent,
-                        "rating": rate_el ? rate_el.textContent : "-",
-                        "store": el.querySelector('div[data-testid="master-product-card"] div[data-testid="shopWrapper"] span[data-testid="spnSRPProdTabShopLoc"] + span').textContent,
+                        name,
+                        price: el.querySelector('div[class*="urMOIDHH7I0Iy1Dv2oFaNw=="]')?.textContent || '-',
+                        store: el.querySelector('span[class*="si3CNdiG8AR0EaXvf6bFbQ=="]')?.textContent || '-',
+                        desc: el.querySelector('a[class*="Ui5-B4CDAk4Cv-cjLm4o0g== XeGJAOdlJaxl4+UD3zEJLg=="]')?.href || '-',
+                        rating: el.querySelector('span[class*="_2NfJxPu4JC-55aCJ8bEsyw=="]')?.textContent || '-',
+                        image: el.querySelector('img[alt="product-image"]')?.src || '-'
                     };
-                })
-                return prod;
-            })
-        )
-        page_num++;
-        url.searchParams.set('page', page_num);
+                    })
+                    .filter(Boolean); // remove nulls
+                }
+            )
+        );
     }
 
     products = products.slice(0, target_number);
