@@ -13,9 +13,11 @@ const pmax = process.argv[5];
 
 const concurrency = 6; // may differ for each device
 const maxRetries = 3;
+let page_num = 1;
 
 const url = new URL('https://www.tokopedia.com/search');
 url.searchParams.set('q', keyword);
+url.searchParams.set('page', page_num);
 if (pmin) url.searchParams.set('pmin', pmin);
 if (pmax) url.searchParams.set('pmax', pmax);
 
@@ -38,13 +40,15 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
     const start = Date.now();
     let products = [];
     let product_found = true;
+    const seen = new Set();
 
     const browser = await puppeteer.launch({ headless: true });
     const page = await browser.newPage();
     await page.setUserAgent(USER_AGENT);
-    await page.goto(url.href);
 
     while (products.length < target_number && product_found) {
+        await page.goto(url.href);
+
         await autoScroll(page);
 
         try {
@@ -70,7 +74,17 @@ const USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
             }).filter(Boolean);
         });
 
-        products = products.concat(newProducts);
+        const uniqueNewProducts = newProducts.filter(p => {
+            const id = `${p.name}-${p.store}`;
+            if (seen.has(id)) return false;
+            seen.add(id);
+            return true;
+        });
+
+        products = products.concat(uniqueNewProducts);
+
+        page_num++;
+        url.searchParams.set('page', page_num);
     }
 
     products = products.slice(0, target_number);
@@ -127,7 +141,7 @@ async function scrapeDescriptions(browser, products) {
 
                     prod.desc = desc || '-';
                     await tab.close();
-                    break; // ✅ Success, break retry loop
+                    break;
                 } catch (err) {
                     if (attempt === maxRetries) {
                         prod.desc = `-failed after ${maxRetries} attempts-`;
