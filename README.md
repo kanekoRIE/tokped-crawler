@@ -22,6 +22,12 @@ Run the program using node.
 node tokped-crawler.js
 ```
 
+Or run performance improved v2
+
+```
+node new.js
+```
+
 add help argument to show useable arguments
 
 ```
