@@ -11,7 +11,8 @@ const target_number = parseInt(process.argv[3]) || 100;
 const pmin = process.argv[4];
 const pmax = process.argv[5];
 
-
+const concurrency = 6; // may differ for each device
+const maxRetries = 3;
 
 const url = new URL('https://www.tokopedia.com/search');
 url.searchParams.set('q', keyword);
@@ -99,7 +100,6 @@ async function autoScroll(page) {
 }
 
 async function scrapeDescriptions(browser, products) {
-    const concurrency = 6;
     const chunks = [];
 
     for (let i = 0; i < products.length; i += concurrency) {
@@ -108,25 +108,33 @@ async function scrapeDescriptions(browser, products) {
 
     for (const chunk of chunks) {
         await Promise.all(chunk.map(async (prod) => {
-            try {
-                const tab = await browser.newPage();
-                await tab.setUserAgent(USER_AGENT);
+            for (let attempt = 1; attempt <= maxRetries; attempt++) {
+                try {
+                    const tab = await browser.newPage();
+                    await tab.setUserAgent(USER_AGENT);
 
-                const rawUrl = new URL(prod.desc);
-                const togo = rawUrl.searchParams.get('r') || rawUrl.href;
+                    const rawUrl = new URL(prod.desc);
+                    const togo = rawUrl.searchParams.get('r') || rawUrl.href;
 
-                await tab.goto(togo.split('?')[0], { timeout: 10000 });
-                await tab.waitForSelector('div[role="tabpanel"] div[data-testid="lblPDPDescriptionProduk"]', { timeout: 10000 });
-                const desc = await tab.$eval('div[role="tabpanel"] div[data-testid="lblPDPDescriptionProduk"]', el => el.textContent);
-                prod.desc = desc?.trim() || '-';
-                console.log(togo.split('?')[0]);
+                    await tab.goto(togo.split('?')[0], { waitUntil: 'domcontentloaded', timeout: 10000 });
 
-                await tab.close();
-            } catch (err) {
-                console.log(err);
-                prod.desc = "-no description-";
+                    await tab.waitForSelector('div[role="tabpanel"] div[data-testid="lblPDPDescriptionProduk"]', { timeout: 5000 });
+
+                    const desc = await tab.$eval(
+                        'div[role="tabpanel"] div[data-testid="lblPDPDescriptionProduk"]',
+                        el => el.textContent.trim()
+                    );
+
+                    prod.desc = desc || '-';
+                    await tab.close();
+                    break; // ✅ Success, break retry loop
+                } catch (err) {
+                    if (attempt === maxRetries) {
+                        prod.desc = `-failed after ${maxRetries} attempts-`;
+                    }
+                }
             }
+            process.stdout.write(".");
         }));
-        process.stdout.write(".");
     }
 }
