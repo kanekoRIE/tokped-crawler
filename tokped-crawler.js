@@ -16,8 +16,10 @@ if (process.argv[3] != null) {
     target_number = process.argv[3];
 }
 
+var page_num = 1;
 var url = new URL('https://www.tokopedia.com/search');
 url.searchParams.set('q', keyword);
+url.searchParams.set('page', page_num);
 if (process.argv[4] != null) {
     url.searchParams.set('pmin', process.argv[4]);
 }
@@ -74,8 +76,9 @@ var product_found = true;
     });
     const page = await browser.newPage();
     await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36');
-    await page.goto(url.href);
     while (products.length <= target_number && product_found) {
+        await page.goto(url.href);
+
         // activate lazyload
         await autoScroll(page);
         try {
@@ -108,6 +111,8 @@ var product_found = true;
                 }
             )
         );
+        page_num++;
+        url.searchParams.set('page', page_num);
     }
 
     products = products.slice(0, target_number);
